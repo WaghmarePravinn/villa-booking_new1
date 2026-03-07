@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "Villa": {
+      "title": "Villa",
+      "description": "A luxury villa property listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "pricePerNight": { "type": "number" },
+        "bedrooms": { "type": "number" },
+        "bathrooms": { "type": "number" },
+        "capacity": { "type": "number" },
+        "description": { "type": "string" },
+        "longDescription": { "type": "string" },
+        "imageUrls": { "type": "array", "items": { "type": "string" } },
+        "videoUrls": { "type": "array", "items": { "type": "string" } },
+        "amenities": { "type": "array", "items": { "type": "string" } },
+        "includedServices": { "type": "array", "items": { "type": "string" } },
+        "isFeatured": { "type": "boolean" },
+        "rating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "mealsAvailable": { "type": "boolean" },
+        "petFriendly": { "type": "boolean" },
+        "refundPolicy": { "type": "string" }
+      },
+      "required": ["name", "location", "pricePerNight", "bedrooms", "capacity", "description", "imageUrls"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "A bespoke service offered by the concierge",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "icon": { "type": "string" }
+      },
+      "required": ["title", "description", "icon"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "A guest review or testimonial",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "content": { "type": "string" },
+        "rating": { "type": "number" },
+        "avatar": { "type": "string" },
+        "category": { "type": "string", "enum": ["Trip", "Booking", "Food", "Service", "Hospitality"] },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["name", "content", "rating"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A booking inquiry or lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "villaId": { "type": "string" },
+        "villaName": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "checkIn": { "type": "string" },
+        "checkOut": { "type": "string" },
+        "guests": { "type": "number" },
+        "status": { "type": "string", "enum": ["new", "contacted", "booked", "lost"] },
+        "source": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["villaId", "customerName", "timestamp"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global site configuration and branding",
+      "type": "object",
+      "properties": {
+        "activeTheme": { "type": "string", "enum": ["REPUBLIC_DAY", "HOLI", "DIWALI", "INDEPENDENCE_DAY", "SUMMER", "WINTER", "DEFAULT"] },
+        "promoText": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "activeOfferId": { "type": "string" },
+        "offerPopup": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "imageUrl": { "type": "string" },
+            "buttonText": { "type": "string" },
+            "buttonLink": { "type": "string" }
+          }
+        }
+      }
+    },
+    "Offer": {
+      "title": "Offer",
+      "description": "A promotional offer or discount",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "discountPercentage": { "type": "number" },
+        "promoCode": { "type": "string" },
+        "expiresAt": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["title", "discountPercentage", "isActive"]
+    }
+  },
+  "firestore": {
+    "villas": { "schema": "Villa", "description": "Collection of luxury villas" },
+    "services": { "schema": "Service", "description": "Collection of concierge services" },
+    "testimonials": { "schema": "Testimonial", "description": "Collection of guest testimonials" },
+    "leads": { "schema": "Lead", "description": "Collection of booking inquiries" },
+    "settings": { "schema": "SiteSettings", "description": "Global site settings" },
+    "offers": { "schema": "Offer", "description": "Collection of promotional offers" }
+  }
+}

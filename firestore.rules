@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: villas
+    // Fields: name, location, pricePerNight, bedrooms, capacity, description, imageUrls, etc.
+    //
+    // Collection: services
+    // Fields: title, description, icon
+    //
+    // Collection: testimonials
+    // Fields: name, content, rating, avatar, category, timestamp
+    //
+    // Collection: leads
+    // Fields: villaId, villaName, customerName, customerPhone, customerEmail, checkIn, checkOut, guests, status, source, timestamp
+    //
+    // Collection: settings
+    // Fields: activeTheme, promoText, whatsappNumber, contactEmail, contactPhone, primaryColor, offerPopup
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email == "pravinwaghmare9356@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Villas: Public read, Admin write
+    match /villas/{villaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Services: Public read, Admin write
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Testimonials: Public read, Admin write
+    match /testimonials/{testimonialId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Leads: Admin read/write, Public create
+    match /leads/{leadId} {
+      allow read: if isAdmin();
+      allow create: if true; // Anyone can submit an inquiry
+      allow update, delete: if isAdmin();
+    }
+
+    // Settings: Public read, Admin write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Offers: Public read, Admin write
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Users: Owner read/write, Admin read/write
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+  }
+}
