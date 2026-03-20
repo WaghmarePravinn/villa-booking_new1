@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Sparkles, Loader2, Bot, User as UserIcon, ExternalLink } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
-import { Villa, User, UserRole, SiteSettings, AppTheme } from '../types';
+import { Villa, User, UserRole, SiteSettings, AppTheme, Offer } from '../types';
 import { db, handleFirestoreError, FirestoreOperationType } from '../firebase';
 import { doc, updateDoc, setDoc } from 'firebase/firestore';
 
@@ -19,10 +18,11 @@ interface AIConciergeProps {
   villas: Villa[];
   user: User | null;
   settings: SiteSettings;
+  offers: Offer[];
   onNavigate: (page: string, id?: string) => void;
 }
 
-export default function AIConcierge({ villas, user, settings, onNavigate }: AIConciergeProps) {
+export default function AIConcierge({ villas, user, settings, offers, onNavigate }: AIConciergeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -46,42 +46,49 @@ export default function AIConcierge({ villas, user, settings, onNavigate }: AICo
     setIsTyping(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          ...messages.map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: m.content }] })),
-          { role: 'user', parts: [{ text: userMessage }] }
-        ],
-        config: {
-          systemInstruction: `You are the "Peak Stay Destination" AI Architect. Your goal is to manage a luxury villa booking ecosystem that is high-selling and easy for an admin to control.
+      const systemInstruction = `You are the "Peak Stay Destination" AI Architect. Your goal is to manage a luxury villa booking ecosystem that is high-selling and easy for an admin to control.
+      
+      VILLA DATA: ${JSON.stringify(villas?.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, bhk: v.bedrooms, location: v.location, price: v.pricePerNight })) || [])}
+      OFFERS DATA: ${JSON.stringify(offers?.filter(o => o.isActive) || [])}
+      CURRENT SETTINGS: ${JSON.stringify(settings)}
+      USER ROLE: ${user?.role || 'guest'}
+      
+      CAPABILITIES:
+      1. RECOMMENDATION ENGINE: 
+         - Suggest villas based on group size (if >4 guests, suggest 3BHK+ options).
+         - Suggest villas based on "vibe": 
+           - "Party in Goa" or "Vibrant" -> Suggest Villa Blackberry in Vagator.
+           - "Quiet retreat", "Peace", or "Serene" -> Suggest Villa Eldeco in Siolim.
+           - "Classic" or "Central" -> Suggest Villa Aarti in Anjuna.
+      2. WHATSAPP CONVERSION: 
+         - We do NOT have online booking. All inquiries must go to WhatsApp.
+         - For every villa recommendation, provide a WhatsApp link using the number from settings: ${settings.whatsappNumber}.
+         - Format: https://wa.me/${settings.whatsappNumber.replace('+', '')}?text=Hello%20Peak%20Stay%20Destination!%20I'm%20interested%20in%20booking%20[Villa%20Name]%20(₹[Price]).%20I%20saw%20the%20[Active%20Offer]%20offer.%20Is%20this%20available%20for%20my%20upcoming%20trip?
+         - If no specific offer is active, omit the offer part.
+      3. ADMIN PANEL LOGIC: If the user is an ADMIN, they can command site updates.
+         - You can update: logo_url (siteLogo), primary_color (primaryColor), brand_name (promoText), active_popup_msg (offerPopup.description), activeTheme, etc.
+         - Example command: "Update the Republic Day offer to 26% off" -> You should update the 'offers' collection AND the 'settings/site' offerPopup.
+         - You MUST return a JSON object wrapped in <update_settings> tags for any configuration changes.
+         - You can also return a JSON object wrapped in <update_offer> tags to update a specific offer in the 'offers' collection.
+         - Only return the fields that need to be changed.
+      
+      TONE: Premium, urgent (using 'Exclusive' and 'Limited' keywords), and highly professional. "Defining Indian Luxury and Legacy Stay".`;
 
-VILLA DATA: ${JSON.stringify(villas.map(v => ({ id: v.id, name: v.name, capacity: v.capacity, bhk: v.bedrooms, location: v.location, price: v.pricePerNight })))}
-CURRENT SETTINGS: ${JSON.stringify(settings)}
-USER ROLE: ${user?.role || 'guest'}
-
-CAPABILITIES:
-1. RECOMMENDATION ENGINE: 
-   - Suggest villas based on group size (if >4 guests, suggest 3BHK+ options).
-   - Suggest villas based on "vibe": 
-     - "Party in Goa" or "Vibrant" -> Suggest Villa Blackberry in Vagator.
-     - "Quiet retreat", "Peace", or "Serene" -> Suggest Villa Eldeco in Siolim.
-     - "Classic" or "Central" -> Suggest Villa Aarti in Anjuna.
-2. WHATSAPP CONVERSION: For every villa recommendation, provide a WhatsApp link in this format: https://wa.me/919157928471?text=Hi!%20I%20am%20interested%20in%20[Villa%20Name].%20Can%20you%20share%20details%20for%20[Dates]?
-3. ADMIN PANEL LOGIC: If the user is an ADMIN, they can command site updates.
-   - You can update: logo_url (siteLogo), primary_color (primaryColor), brand_name (promoText), active_popup_msg (offerPopup.description), activeTheme, etc.
-   - Example command: "Update the Republic Day offer to 26% off" -> You should update the 'offers' collection AND the 'settings/site' offerPopup.
-   - You MUST return a JSON object wrapped in <update_settings> tags for any configuration changes.
-   - You can also return a JSON object wrapped in <update_offer> tags to update a specific offer in the 'offers' collection.
-   - Example: <update_offer>{"id": "republic-day", "title": "Republic Day Special", "discountPercentage": 26, "isActive": true}</update_offer>
-   - Example: <update_settings>{"activeTheme": "REPUBLIC_DAY", "offerPopup": {"title": "Republic Day Special", "description": "26% off on all bookings!"}}</update_settings>
-   - Only return the fields that need to be changed.
-
-TONE: Premium, urgent (using 'Exclusive' and 'Limited' keywords), and highly professional. "Defining Indian Luxury and Legacy Stay".`,
-        }
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: messages?.map(m => ({ role: m.role, content: m.content })),
+          systemInstruction
+        })
       });
 
-      const responseText = response.text || "";
+      if (!response.ok) {
+        throw new Error('AI Proxy request failed');
+      }
+
+      const data = await response.json();
+      const responseText = data.choices?.[0]?.message?.content || "";
       
       // Check for admin updates
       let action;
@@ -171,7 +178,7 @@ TONE: Premium, urgent (using 'Exclusive' and 'Limited' keywords), and highly pro
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-grow overflow-y-auto p-6 space-y-4 bg-stone-50/50">
-              {messages.map((m, i) => (
+              {messages?.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
                     m.role === 'user' 

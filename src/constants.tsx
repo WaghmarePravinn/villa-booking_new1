@@ -15,7 +15,7 @@ export const HOTSPOT_LOCATIONS = [
 
 export const INITIAL_VILLAS: Villa[] = [
   {
-    id: '00000000-0000-0000-0000-000000000001',
+    id: 'villa-aarti-anjuna',
     name: "Villa Aarti 2BHK Anjuna",
     location: "Anjuna, Goa",
     pricePerNight: 28500,
@@ -23,15 +23,18 @@ export const INITIAL_VILLAS: Villa[] = [
     bathrooms: 2,
     capacity: 6,
     description: "Elegant 2BHK sanctuary featuring white-brick walls, a private lap pool, and bespoke canopy beds.",
-    longDescription: "Villa Aarti is a masterclass in modern coastal minimalism. The property boasts stunning white brick interiors, vertical subway-tiled bathrooms, and a designer modular kitchen. Outdoors, a private azure lap pool is framed by lush tropical greenery, offering a perfect sanctuary for discerning travelers.",
+    longDescription: "Villa Aarti is a masterclass in modern coastal minimalism. The property boasts stunning white brick interiors in the bedrooms, vertical subway-tiled bathrooms, and a designer modular kitchen with a dedicated dining area. The living space is designed for comfort with plush seating and a large flat-screen TV. Outdoors, a private azure lap pool is framed by lush tropical greenery and features a signature 'Villa Aarti' welcome sign, offering a perfect sanctuary for discerning travelers.",
     imageUrls: [
-      "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?auto=format&fit=crop&q=80&w=1200", 
+      "https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=1200", 
+      "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?auto=format&fit=crop&q=80&w=1200",
       "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1520699049698-acd2fccb8cc8?auto=format&fit=crop&q=80&w=1200"
+      "https://images.unsplash.com/photo-1556911223-e15204113f5a?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&q=80&w=1200"
     ],
     videoUrls: [],
-    amenities: ["Private Lap Pool", "Canopy Beds", "Modular Kitchen", "White Brick Interiors", "Designer Tiling", "Wi-Fi", "AC"],
-    includedServices: ["Daily Housekeeping", "On-call Caretaker"],
+    amenities: ["Private Lap Pool", "White Brick Interiors", "Vertical Subway Tiles", "Modular Kitchen", "Dining Area", "Canopy Beds", "Wi-Fi", "AC", "Daily Housekeeping", "On-call Caretaker", "Parking", "Power Backup"],
+    includedServices: ["Daily Housekeeping", "On-call Caretaker", "Airport Transfer (Paid)"],
     isFeatured: true,
     rating: 4.9,
     ratingCount: 18,
@@ -41,54 +44,29 @@ export const INITIAL_VILLAS: Villa[] = [
     refundPolicy: "Full refund if cancelled 7 days before check-in."
   },
   {
-    id: '00000000-0000-0000-0000-000000000004',
-    name: "Villa Blackberry 3BHK Vagator",
-    location: "Vagator, Goa",
-    pricePerNight: 45000,
-    bedrooms: 3,
-    bathrooms: 3,
-    capacity: 8,
-    description: "The ultimate party sanctuary in Vagator. High-energy vibes with a private pool and sound system.",
-    longDescription: "Villa Blackberry is designed for those who want to experience the vibrant energy of Vagator. Featuring a massive private pool, state-of-the-art sound system, and expansive deck areas, it's the perfect spot for a high-end celebration or a vibrant group getaway.",
-    imageUrls: [
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1510798831971-661eb04b3739?auto=format&fit=crop&q=80&w=1200"
-    ],
-    videoUrls: [],
-    amenities: ["Private Pool", "Party Deck", "Sound System", "Wi-Fi", "AC", "Barbecue"],
-    includedServices: ["Daily Housekeeping", "Party Planning Support"],
-    isFeatured: true,
-    rating: 4.7,
-    ratingCount: 25,
-    numRooms: 3,
-    mealsAvailable: true,
-    petFriendly: true,
-    refundPolicy: "72 hours before check-in."
-  },
-  {
-    id: '00000000-0000-0000-0000-000000000005',
-    name: "Villa Eldeco 4BHK Siolim",
-    location: "Siolim, Goa",
-    pricePerNight: 65000,
+    id: 'villa-majestica-siolim',
+    name: "Villa Majestica",
+    location: "Siolim",
+    pricePerNight: 5000,
     bedrooms: 4,
     bathrooms: 4,
     capacity: 10,
-    description: "A serene riverside retreat in Siolim. Defining peace and luxury with a private infinity pool.",
-    longDescription: "Villa Eldeco offers a quiet retreat away from the bustle. Nestled along the riverside in Siolim, this 4BHK masterpiece features an infinity pool overlooking the water, lush tropical gardens, and a legacy architecture that blends seamlessly with nature.",
+    description: "A new 4bhk luxury villa in Siolim with pool and wifi.",
+    longDescription: "Villa Majestica is a brand new luxury sanctuary in the heart of Siolim. This 4BHK masterpiece offers unparalleled privacy and comfort, featuring a private pool, high-speed WiFi, and dedicated housekeeping. Perfect for large families or groups seeking an extraordinary escape.",
     imageUrls: [
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=1200",
-      "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&q=80&w=1200"
+      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&q=80&w=1200"
     ],
     videoUrls: [],
-    amenities: ["Infinity Pool", "Riverside View", "Tropical Garden", "Wi-Fi", "AC", "Chef on Call"],
-    includedServices: ["Daily Housekeeping", "Private Chef"],
+    amenities: ["Private Pool", "High-speed WiFi", "Housekeeping", "AC", "Power Backup", "Parking"],
+    includedServices: ["Housekeeping", "Concierge Support"],
     isFeatured: true,
-    rating: 5.0,
-    ratingCount: 12,
+    rating: 4.8,
+    ratingCount: 0,
     numRooms: 4,
     mealsAvailable: true,
     petFriendly: false,
-    refundPolicy: "Full refund if cancelled 14 days before check-in."
+    refundPolicy: "Flexible cancellation policy."
   }
 ];
 

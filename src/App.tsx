@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, doc, getDoc, setDoc, query, orderBy } from 'firebase/firestore';
-import { auth, db, logout, loginWithGoogle } from './firebase';
+import { auth, db, logout, loginWithGoogle, handleFirestoreError, FirestoreOperationType } from './firebase';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import VillaListingPage from './pages/VillaListingPage';
 import VillaDetailPage from './pages/VillaDetailPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AIConcierge from './components/AIConcierge';
-import { User, UserRole, SiteSettings, AppTheme, Villa, Service, Testimonial } from './types';
+import { User, UserRole, SiteSettings, AppTheme, Villa, Service, Testimonial, Offer } from './types';
 import { INITIAL_VILLAS, SERVICES, TESTIMONIALS } from './constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
@@ -38,6 +38,7 @@ export default function App() {
   const [villas, setVillas] = useState<Villa[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [showPopup, setShowPopup] = useState(false);
 
   // Auth Listener
@@ -100,31 +101,38 @@ export default function App() {
         // Initialize settings if they don't exist
         setDoc(doc(db, 'settings', 'site'), DEFAULT_SETTINGS);
       }
-    });
+    }, (error) => handleFirestoreError(error, FirestoreOperationType.GET, 'settings/site'));
 
     // Villas
     const unsubVillas = onSnapshot(collection(db, 'villas'), (snapshot) => {
       const villaList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Villa));
       setVillas(villaList.length > 0 ? villaList : INITIAL_VILLAS);
-    });
+    }, (error) => handleFirestoreError(error, FirestoreOperationType.LIST, 'villas'));
 
     // Services
     const unsubServices = onSnapshot(collection(db, 'services'), (snapshot) => {
       const serviceList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
       setServices(serviceList.length > 0 ? serviceList : SERVICES);
-    });
+    }, (error) => handleFirestoreError(error, FirestoreOperationType.LIST, 'services'));
 
     // Testimonials
     const unsubTestimonials = onSnapshot(query(collection(db, 'testimonials'), orderBy('timestamp', 'desc')), (snapshot) => {
       const testimonialList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
       setTestimonials(testimonialList.length > 0 ? testimonialList : TESTIMONIALS);
-    });
+    }, (error) => handleFirestoreError(error, FirestoreOperationType.LIST, 'testimonials'));
+
+    // Offers
+    const unsubOffers = onSnapshot(query(collection(db, 'offers')), (snapshot) => {
+      const offerList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Offer));
+      setOffers(offerList.filter(o => o.isActive));
+    }, (error) => handleFirestoreError(error, FirestoreOperationType.LIST, 'offers'));
 
     return () => {
       unsubSettings();
       unsubVillas();
       unsubServices();
       unsubTestimonials();
+      unsubOffers();
     };
   }, [isAuthReady]);
 
@@ -173,11 +181,11 @@ export default function App() {
 
     switch (currentPage) {
       case 'home':
-        return <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} />;
+        return <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} offers={offers} user={user} />;
       case 'villas':
-        return <VillaListingPage onNavigate={navigate} villas={villas} />;
+        return <VillaListingPage onNavigate={navigate} villas={villas} user={user} />;
       case 'villa-detail':
-        return <VillaDetailPage villaId={selectedVillaId} onNavigate={navigate} villas={villas} settings={settings} />;
+        return <VillaDetailPage villaId={selectedVillaId} onNavigate={navigate} villas={villas} settings={settings} offers={offers} user={user} />;
       case 'login':
         return (
           <div className="min-h-[70vh] flex items-center justify-center px-4">
@@ -195,9 +203,9 @@ export default function App() {
           </div>
         );
       case 'admin':
-        return user?.role === UserRole.ADMIN ? <AdminDashboard user={user} onNavigate={navigate} /> : <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} />;
+        return user?.role === UserRole.ADMIN ? <AdminDashboard user={user} onNavigate={navigate} /> : <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} offers={offers} user={user} />;
       default:
-        return <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} />;
+        return <HomePage onNavigate={navigate} villas={villas} services={services} testimonials={testimonials} settings={settings} offers={offers} user={user} />;
     }
   };
 
@@ -209,6 +217,7 @@ export default function App() {
         villas={villas} 
         user={user} 
         settings={settings} 
+        offers={offers}
         onNavigate={navigate} 
       />
 

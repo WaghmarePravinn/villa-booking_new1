@@ -1,31 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Star, Users, Bed, Bath, ArrowLeft, Share2, Heart, Check, Calendar, Phone, ShieldCheck, Coffee, Wind, Loader2 } from 'lucide-react';
+import { MapPin, Star, Users, Bed, Bath, ArrowLeft, Share2, Heart, Check, Phone, ShieldCheck, Utensils, PawPrint, Home, Coffee, Car, UserCheck, Sparkles, Info, ChevronLeft, ChevronRight, Trash2, ArrowLeftRight, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Villa, SiteSettings, LeadStatus } from '../types';
+import { Villa, SiteSettings, Offer, User, UserRole } from '../types';
+import { doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, FirestoreOperationType } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface VillaDetailPageProps {
   villaId: string | null;
   onNavigate: (page: string, id?: string) => void;
   villas: Villa[];
   settings: SiteSettings;
+  offers: Offer[];
+  user?: User | null;
 }
 
-export default function VillaDetailPage({ villaId, onNavigate, villas, settings }: VillaDetailPageProps) {
+export default function VillaDetailPage({ villaId, onNavigate, villas, settings, offers, user }: VillaDetailPageProps) {
   const [villa, setVilla] = useState<Villa | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
-  const [isBooking, setIsBooking] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    guests: 1,
-    checkIn: '',
-    checkOut: ''
-  });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const isAdmin = user?.role === UserRole.ADMIN;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!villa?.imageUrls) return;
+      if (e.key === 'ArrowLeft') {
+        setActiveImage((prev) => (prev - 1 + villa.imageUrls.length) % villa.imageUrls.length);
+      } else if (e.key === 'ArrowRight') {
+        setActiveImage((prev) => (prev + 1) % villa.imageUrls.length);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [villa]);
+
+  const updateImages = async (newImages: string[]) => {
+    if (!villa) return;
+    setIsUpdating(true);
+    try {
+      await updateDoc(doc(db, 'villas', villa.id), {
+        imageUrls: newImages
+      });
+    } catch (error) {
+      handleFirestoreError(error, FirestoreOperationType.UPDATE, `villas/${villa.id}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const deleteImage = async (idx: number) => {
+    if (!villa || !window.confirm('Delete this image?')) return;
+    const newImages = [...villa.imageUrls];
+    newImages.splice(idx, 1);
+    if (activeImage >= newImages.length) {
+      setActiveImage(Math.max(0, newImages.length - 1));
+    }
+    await updateImages(newImages);
+  };
+
+  const moveImage = async (from: number, to: number) => {
+    if (!villa) return;
+    const newImages = [...villa.imageUrls];
+    [newImages[from], newImages[to]] = [newImages[to], newImages[from]];
+    setActiveImage(to);
+    await updateImages(newImages);
+  };
+
+  const addImage = async () => {
+    if (!villa) return;
+    const url = prompt('Enter Image URL:');
+    if (url) {
+      await updateImages([...villa.imageUrls, url]);
+      setActiveImage(villa.imageUrls.length);
+    }
+  };
 
   useEffect(() => {
     if (villaId) {
@@ -43,36 +92,10 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
     </div>
   );
 
-  const handleBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsBooking(true);
-
-    try {
-      await addDoc(collection(db, 'leads'), {
-        ...formData,
-        villaId: villa.id,
-        villaName: villa.name,
-        status: LeadStatus.NEW,
-        createdAt: serverTimestamp(),
-      });
-      setBookingSuccess(true);
-      
-      const message = `Hi! I am interested in ${villa.name}. Can you share details for ${formData.checkIn} to ${formData.checkOut}?`;
-      const whatsappUrl = `https://wa.me/919157928471?text=${encodeURIComponent(message)}`;
-      
-      setTimeout(() => {
-        window.open(whatsappUrl, '_blank');
-      }, 2000);
-
-    } catch (error) {
-      handleFirestoreError(error, FirestoreOperationType.CREATE, 'leads');
-    } finally {
-      setIsBooking(false);
-    }
-  };
-
   const handleWhatsAppInquiry = () => {
-    const message = `Hi Peak Stay! I'm interested in booking ${villa.name} in ${villa.location}. Could you please share more details?`;
+    const activeOffer = offers.find(o => o.id === settings.activeOfferId) || offers.find(o => o.isActive);
+    const offerText = activeOffer ? ` I saw the ${activeOffer.title} offer.` : '';
+    const message = `Hello Peak Stay Destination! I'm interested in booking ${villa.name} (₹${villa.pricePerNight.toLocaleString()}).${offerText} Is this available for my upcoming trip?`;
     window.open(`https://wa.me/${settings.whatsappNumber.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -107,7 +130,7 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            src={villa.imageUrls[activeImage]} 
+            src={villa.imageUrls?.[activeImage]} 
             alt={villa.name}
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
@@ -115,27 +138,83 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
         </AnimatePresence>
         
         {/* Gallery Thumbnails - Desktop */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex space-x-3 bg-black/20 backdrop-blur-md p-2 rounded-2xl border border-white/10">
-          {villa.imageUrls.map((img, idx) => (
-            <button 
-              key={idx}
-              onClick={() => setActiveImage(idx)}
-              className={`w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-amber-500 scale-105' : 'border-transparent opacity-60 hover:opacity-100'}`}
-            >
-              <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            </button>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 hidden md:flex items-center space-x-3 bg-black/20 backdrop-blur-md p-2 rounded-2xl border border-white/10">
+          {villa.imageUrls?.map((img, idx) => (
+            <div key={idx} className="relative group/thumb">
+              <button 
+                onClick={() => setActiveImage(idx)}
+                className={`w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${activeImage === idx ? 'border-amber-500 scale-105' : 'border-transparent opacity-60 hover:opacity-100'}`}
+              >
+                <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </button>
+              
+              {isAdmin && (
+                <div className="absolute -top-2 -right-2 flex flex-col gap-1 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => deleteImage(idx)}
+                    className="bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                  <div className="flex gap-0.5">
+                    {idx > 0 && (
+                      <button 
+                        onClick={() => moveImage(idx, idx - 1)}
+                        className="bg-stone-900 text-white p-1 rounded-full shadow-lg hover:bg-stone-800"
+                      >
+                        <ChevronLeft size={10} />
+                      </button>
+                    )}
+                    {idx < villa.imageUrls.length - 1 && (
+                      <button 
+                        onClick={() => moveImage(idx, idx + 1)}
+                        className="bg-stone-900 text-white p-1 rounded-full shadow-lg hover:bg-stone-800"
+                      >
+                        <ChevronRight size={10} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           ))}
+          {isAdmin && (
+            <button 
+              onClick={addImage}
+              className="w-20 h-14 rounded-lg border-2 border-dashed border-white/30 flex items-center justify-center text-white hover:border-white/60 transition-all"
+            >
+              <Plus size={20} />
+            </button>
+          )}
         </div>
 
         {/* Gallery Dots - Mobile */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-2 md:hidden">
-          {villa.imageUrls.map((_, idx) => (
+          {villa.imageUrls?.map((_, idx) => (
             <div 
               key={idx} 
               className={`w-2 h-2 rounded-full transition-all ${activeImage === idx ? 'bg-white w-4' : 'bg-white/40'}`}
             />
           ))}
         </div>
+
+        {/* Navigation Arrows */}
+        {villa.imageUrls && villa.imageUrls.length > 1 && (
+          <div className="absolute inset-0 flex items-center justify-between p-4 pointer-events-none">
+            <button 
+              onClick={() => setActiveImage((prev) => (prev - 1 + villa.imageUrls.length) % villa.imageUrls.length)}
+              className="pointer-events-auto bg-black/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-black/40 transition-all border border-white/10 shadow-xl"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button 
+              onClick={() => setActiveImage((prev) => (prev + 1) % villa.imageUrls.length)}
+              className="pointer-events-auto bg-black/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-black/40 transition-all border border-white/10 shadow-xl"
+            >
+              <ChevronRight size={24} />
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Content Grid */}
@@ -170,6 +249,12 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
                   <Bath size={20} className="text-stone-400" />
                   <span className="text-sm font-medium text-stone-600 uppercase tracking-wider">{villa.bathrooms} Bathrooms</span>
                 </div>
+                {villa.numRooms && (
+                  <div className="flex items-center space-x-2">
+                    <Home size={20} className="text-stone-400" />
+                    <span className="text-sm font-medium text-stone-600 uppercase tracking-wider">{villa.numRooms} Total Rooms</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -187,7 +272,7 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
             <div className="mb-12">
               <h3 className="text-2xl font-serif font-bold text-stone-900 mb-6">Elite Amenities</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {villa.amenities.map(amenity => (
+                {villa.amenities?.map(amenity => (
                   <div key={amenity} className="flex items-center space-x-3 bg-white p-4 rounded-2xl border border-stone-100 shadow-sm">
                     <div className="bg-amber-50 p-2 rounded-lg text-amber-600">
                       <Check size={16} />
@@ -201,21 +286,60 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
             {/* Included Services */}
             <div className="mb-12">
               <h3 className="text-2xl font-serif font-bold text-stone-900 mb-6">Included Services</h3>
-              <div className="flex flex-wrap gap-3">
-                {villa.includedServices.map(service => (
-                  <span key={service} className="px-4 py-2 bg-stone-900 text-white rounded-full text-xs font-bold uppercase tracking-widest">
-                    {service}
-                  </span>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {villa.includedServices?.map(service => {
+                  const getIcon = (s: string) => {
+                    const lower = s.toLowerCase();
+                    if (lower.includes('housekeeping')) return <Sparkles size={18} />;
+                    if (lower.includes('caretaker') || lower.includes('concierge')) return <UserCheck size={18} />;
+                    if (lower.includes('transfer') || lower.includes('chauffeur')) return <Car size={18} />;
+                    if (lower.includes('chef') || lower.includes('meals')) return <Utensils size={18} />;
+                    if (lower.includes('breakfast') || lower.includes('coffee')) return <Coffee size={18} />;
+                    return <Check size={18} />;
+                  };
+
+                  return (
+                    <div key={service} className="flex items-center space-x-4 p-4 bg-white rounded-2xl border border-stone-100 shadow-sm">
+                      <div className="bg-stone-900 text-white p-2 rounded-xl">
+                        {getIcon(service)}
+                      </div>
+                      <span className="text-sm font-bold text-stone-800 uppercase tracking-wider">{service}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Refund Policy */}
-            <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex items-start space-x-4">
-              <ShieldCheck className="text-amber-600 shrink-0" size={24} />
-              <div>
-                <h4 className="font-bold text-stone-900 mb-1 uppercase tracking-wider text-xs">Cancellation Policy</h4>
-                <p className="text-stone-600 text-sm">{villa.refundPolicy}</p>
+            {/* Logistics & Policies */}
+            <div className="mb-12">
+              <h3 className="text-2xl font-serif font-bold text-stone-900 mb-6">Logistics & Policies</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className={`p-6 rounded-3xl border flex items-center space-x-4 ${villa.mealsAvailable ? 'bg-emerald-50 border-emerald-100' : 'bg-stone-50 border-stone-100 opacity-60'}`}>
+                  <div className={`${villa.mealsAvailable ? 'text-emerald-600' : 'text-stone-400'}`}>
+                    <Utensils size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">Dining</h4>
+                    <p className="text-stone-600 text-sm">{villa.mealsAvailable ? 'Gourmet meals available on request' : 'Self-catering only'}</p>
+                  </div>
+                </div>
+                <div className={`p-6 rounded-3xl border flex items-center space-x-4 ${villa.petFriendly ? 'bg-blue-50 border-blue-100' : 'bg-stone-50 border-stone-100 opacity-60'}`}>
+                  <div className={`${villa.petFriendly ? 'text-blue-600' : 'text-stone-400'}`}>
+                    <PawPrint size={24} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider">Pets</h4>
+                    <p className="text-stone-600 text-sm">{villa.petFriendly ? 'Pet friendly environment' : 'No pets allowed'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 flex items-start space-x-4">
+                <ShieldCheck className="text-amber-600 shrink-0" size={24} />
+                <div>
+                  <h4 className="font-bold text-stone-900 mb-1 uppercase tracking-wider text-xs">Cancellation Policy</h4>
+                  <p className="text-stone-600 text-sm leading-relaxed">{villa.refundPolicy}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -235,75 +359,20 @@ export default function VillaDetailPage({ villaId, onNavigate, villas, settings 
                 </div>
               </div>
 
-              <div className="space-y-4 mb-8">
-                {bookingSuccess ? (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="bg-green-50 p-6 rounded-2xl border border-green-100 text-center"
+              <div className="space-y-6 mb-8">
+                <div className="bg-stone-50 p-6 rounded-2xl border border-stone-100">
+                  <h4 className="font-serif font-bold text-stone-900 mb-2">Direct Booking</h4>
+                  <p className="text-stone-500 text-sm mb-6 leading-relaxed">
+                    Skip the forms. Connect directly with our concierge on WhatsApp for instant availability and legacy pricing.
+                  </p>
+                  <button 
+                    onClick={handleWhatsAppInquiry}
+                    className="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl hover:bg-stone-800 transition-all flex items-center justify-center space-x-3"
                   >
-                    <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-white">
-                      <Check size={24} />
-                    </div>
-                    <h4 className="font-serif font-bold text-green-900 mb-2">Inquiry Sent!</h4>
-                    <p className="text-green-700 text-sm mb-4">Our concierge will contact you shortly. Redirecting to WhatsApp...</p>
-                  </motion.div>
-                ) : (
-                  <form onSubmit={handleBooking} className="space-y-4">
-                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1 block">Full Name</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-transparent border-none p-0 focus:ring-0 text-sm font-medium text-stone-800"
-                        placeholder="John Doe"
-                      />
-                    </div>
-                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1 block">Phone Number</label>
-                      <input 
-                        required
-                        type="tel" 
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full bg-transparent border-none p-0 focus:ring-0 text-sm font-medium text-stone-800"
-                        placeholder="+91 98765 43210"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1 block">Check In</label>
-                        <input 
-                          required
-                          type="date" 
-                          value={formData.checkIn}
-                          onChange={(e) => setFormData({...formData, checkIn: e.target.value})}
-                          className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-medium text-stone-800"
-                        />
-                      </div>
-                      <div className="bg-stone-50 p-3 rounded-xl border border-stone-100">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-1 block">Check Out</label>
-                        <input 
-                          required
-                          type="date" 
-                          value={formData.checkOut}
-                          onChange={(e) => setFormData({...formData, checkOut: e.target.value})}
-                          className="w-full bg-transparent border-none p-0 focus:ring-0 text-xs font-medium text-stone-800"
-                        />
-                      </div>
-                    </div>
-                    <button 
-                      type="submit"
-                      disabled={isBooking}
-                      className="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest shadow-xl hover:bg-stone-800 transition-all flex items-center justify-center space-x-3 disabled:opacity-70"
-                    >
-                      {isBooking ? <Loader2 className="animate-spin" size={18} /> : <Calendar size={18} />}
-                      <span>{isBooking ? 'Processing...' : 'Request Booking'}</span>
-                    </button>
-                  </form>
-                )}
+                    <Phone size={18} />
+                    <span>Inquire on WhatsApp</span>
+                  </button>
+                </div>
               </div>
               
               <p className="text-center text-[10px] text-stone-400 mt-6 uppercase tracking-widest font-medium">

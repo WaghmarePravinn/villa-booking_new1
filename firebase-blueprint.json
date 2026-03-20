@@ -12,6 +12,7 @@
         "bedrooms": { "type": "number" },
         "bathrooms": { "type": "number" },
         "capacity": { "type": "number" },
+        "numRooms": { "type": "number" },
         "description": { "type": "string" },
         "longDescription": { "type": "string" },
         "imageUrls": { "type": "array", "items": { "type": "string" } },

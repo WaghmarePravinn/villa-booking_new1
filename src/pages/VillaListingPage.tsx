@@ -3,21 +3,32 @@ import { Search, Filter, X, MapPin, ChevronDown, SlidersHorizontal } from 'lucid
 import { motion, AnimatePresence } from 'motion/react';
 import { HOTSPOT_LOCATIONS } from '../constants';
 import VillaCard from '../components/VillaCard';
-import { Villa, VillaFilters } from '../types';
+import { Villa, VillaFilters, User } from '../types';
 
 interface VillaListingPageProps {
   onNavigate: (page: string, id?: string) => void;
   villas: Villa[];
+  user: User | null;
 }
 
-export default function VillaListingPage({ onNavigate, villas }: VillaListingPageProps) {
+export default function VillaListingPage({ onNavigate, villas, user }: VillaListingPageProps) {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [filters, setFilters] = useState<VillaFilters>({
     location: '',
     minPrice: 0,
     maxPrice: 1000000,
     bedrooms: 0,
+    checkIn: '',
+    checkOut: '',
   });
+
+  const suggestions = useMemo(() => {
+    if (!filters.location.trim()) return [];
+    const query = filters.location.toLowerCase();
+    const locs = Array.from(new Set(villas.map(v => v.location)));
+    return locs.filter(l => l.toLowerCase().includes(query)).slice(0, 5);
+  }, [filters.location, villas]);
 
   const filteredVillas = useMemo(() => {
     return villas.filter(villa => {
@@ -28,7 +39,7 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
     });
   }, [filters, villas]);
 
-  const locations = ['All Locations', ...new Set(villas.map(v => v.location.split(',')[1]?.trim() || v.location))];
+  const locations = ['All Locations', ...new Set(villas?.map(v => v.location.split(',')[1]?.trim() || v.location) || [])];
 
   return (
     <div className="bg-stone-50 min-h-screen">
@@ -51,30 +62,76 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
       {/* Filter Bar - Desktop */}
       <div className="sticky top-16 z-40 bg-white border-b border-stone-200 shadow-sm hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-6">
-          <div className="flex items-center space-x-6 flex-grow">
-            <div className="relative flex-grow max-w-xs">
+          <div className="flex items-center space-x-4 flex-grow">
+            <div className="relative flex-grow max-w-[240px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
               <input 
                 type="text" 
-                placeholder="Search by name or location..."
+                placeholder="Search location..."
+                value={filters.location}
                 className="w-full pl-10 pr-4 py-2 bg-stone-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-amber-500/20"
                 onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               />
+              
+              <AnimatePresence>
+                {isSearchFocused && suggestions.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-stone-100 overflow-hidden z-50"
+                  >
+                    <div className="px-4 py-2 bg-stone-50 border-b border-stone-100">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Suggestions</span>
+                    </div>
+                    {suggestions.map((s, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setFilters({ ...filters, location: s })}
+                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-stone-50 transition-colors text-left border-b border-stone-50 last:border-none"
+                      >
+                        <MapPin size={14} className="text-amber-500" />
+                        <span className="text-xs font-medium text-stone-800">{s}</span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <select 
                 className="bg-stone-50 border-none rounded-xl text-sm py-2 px-4 focus:ring-2 focus:ring-amber-500/20"
                 onChange={(e) => setFilters({ ...filters, location: e.target.value === 'All Locations' ? '' : e.target.value })}
               >
-                {locations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                {locations?.map(loc => <option key={loc} value={loc}>{loc}</option>)}
               </select>
+
+              <div className="flex items-center bg-stone-50 rounded-xl px-3 py-1 space-x-2 border border-transparent focus-within:ring-2 focus-within:ring-amber-500/20">
+                <span className="text-[10px] font-bold text-stone-400 uppercase">In</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none text-xs focus:ring-0 p-1"
+                  onChange={(e) => setFilters({ ...filters, checkIn: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center bg-stone-50 rounded-xl px-3 py-1 space-x-2 border border-transparent focus-within:ring-2 focus-within:ring-amber-500/20">
+                <span className="text-[10px] font-bold text-stone-400 uppercase">Out</span>
+                <input 
+                  type="date" 
+                  className="bg-transparent border-none text-xs focus:ring-0 p-1"
+                  onChange={(e) => setFilters({ ...filters, checkOut: e.target.value })}
+                />
+              </div>
 
               <select 
                 className="bg-stone-50 border-none rounded-xl text-sm py-2 px-4 focus:ring-2 focus:ring-amber-500/20"
                 onChange={(e) => setFilters({ ...filters, bedrooms: parseInt(e.target.value) })}
               >
-                <option value="0">Any Bedrooms</option>
+                <option value="0">Any BHK</option>
                 <option value="2">2+ BHK</option>
                 <option value="3">3+ BHK</option>
                 <option value="4">4+ BHK</option>
@@ -82,7 +139,7 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 text-stone-400 text-xs font-bold uppercase tracking-widest">
+          <div className="flex items-center space-x-2 text-stone-400 text-[10px] font-bold uppercase tracking-widest">
             <span>{filteredVillas.length} Results Found</span>
           </div>
         </div>
@@ -106,14 +163,14 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {filteredVillas.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredVillas.map((villa, idx) => (
+            {filteredVillas?.map((villa, idx) => (
               <motion.div
                 key={villa.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
               >
-                <VillaCard villa={villa} onClick={(id) => onNavigate('villa-detail', id)} />
+                <VillaCard villa={villa} onClick={(id) => onNavigate('villa-detail', id)} user={user} />
               </motion.div>
             ))}
           </div>
@@ -127,7 +184,7 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
               We couldn't find any villas matching your current filters. Try adjusting your search.
             </p>
             <button 
-              onClick={() => setFilters({ location: '', minPrice: 0, maxPrice: 100000, bedrooms: 0 })}
+              onClick={() => setFilters({ location: '', minPrice: 0, maxPrice: 1000000, bedrooms: 0, checkIn: '', checkOut: '' })}
               className="mt-8 text-amber-600 font-bold text-xs uppercase tracking-widest"
             >
               Clear All Filters
@@ -162,10 +219,29 @@ export default function VillaListingPage({ onNavigate, villas }: VillaListingPag
               </div>
 
               <div className="space-y-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2 block">Check In</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-stone-100 border-none rounded-xl text-sm p-3 focus:ring-2 focus:ring-amber-500/20"
+                      onChange={(e) => setFilters({ ...filters, checkIn: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2 block">Check Out</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-stone-100 border-none rounded-xl text-sm p-3 focus:ring-2 focus:ring-amber-500/20"
+                      onChange={(e) => setFilters({ ...filters, checkOut: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-4 block">Location</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {locations.map(loc => (
+                    {locations?.map(loc => (
                       <button
                         key={loc}
                         onClick={() => setFilters({ ...filters, location: loc === 'All Locations' ? '' : loc })}

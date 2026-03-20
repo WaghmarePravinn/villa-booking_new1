@@ -1,13 +1,71 @@
-import React from 'react';
-import { MapPin, Star, Users, Bed, Bath } from 'lucide-react';
-import { Villa } from '../types';
+import React, { useState } from 'react';
+import { MapPin, Star, Users, Bed, Bath, ChevronLeft, ChevronRight, Trash2, ArrowLeftRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Villa, User, UserRole } from '../types';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, FirestoreOperationType } from '../firebase';
 
 interface VillaCardProps {
   villa: Villa;
   onClick: (id: string) => void;
+  user?: User | null;
 }
 
-export default function VillaCard({ villa, onClick }: VillaCardProps) {
+export default function VillaCard({ villa, onClick, user }: VillaCardProps) {
+  const [currentImage, setCurrentImage] = useState(0);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const isAdmin = user?.role === UserRole.ADMIN;
+
+  const updateImages = async (newImages: string[]) => {
+    setIsUpdating(true);
+    try {
+      await updateDoc(doc(db, 'villas', villa.id), {
+        imageUrls: newImages
+      });
+    } catch (error) {
+      handleFirestoreError(error, FirestoreOperationType.UPDATE, `villas/${villa.id}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const deleteImage = async (e: React.MouseEvent, idx: number) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this image?')) return;
+    
+    const newImages = [...villa.imageUrls];
+    newImages.splice(idx, 1);
+    
+    if (currentImage >= newImages.length) {
+      setCurrentImage(Math.max(0, newImages.length - 1));
+    }
+    
+    await updateImages(newImages);
+  };
+
+  const moveImage = async (e: React.MouseEvent, from: number, to: number) => {
+    e.stopPropagation();
+    const newImages = [...villa.imageUrls];
+    [newImages[from], newImages[to]] = [newImages[to], newImages[from]];
+    setCurrentImage(to);
+    await updateImages(newImages);
+  };
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (villa.imageUrls && villa.imageUrls.length > 0) {
+      setCurrentImage((prev) => (prev + 1) % villa.imageUrls.length);
+    }
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (villa.imageUrls && villa.imageUrls.length > 0) {
+      setCurrentImage((prev) => (prev - 1 + villa.imageUrls.length) % villa.imageUrls.length);
+    }
+  };
+
   return (
     <div 
       onClick={() => onClick(villa.id)}
@@ -15,12 +73,84 @@ export default function VillaCard({ villa, onClick }: VillaCardProps) {
     >
       {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden">
-        <img 
-          src={villa.imageUrls[0]} 
-          alt={villa.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          referrerPolicy="no-referrer"
-        />
+        <AnimatePresence mode="wait">
+          <motion.img 
+            key={currentImage}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            src={villa.imageUrls?.[currentImage] || "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=1920"} 
+            alt={villa.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
+
+        {/* Carousel Controls */}
+        {villa.imageUrls && villa.imageUrls.length > 1 && (
+          <div className="absolute inset-0 flex items-center justify-between p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={prevImage}
+              className="bg-white/80 backdrop-blur-sm p-1.5 rounded-full text-stone-800 hover:bg-white transition-colors shadow-lg"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button 
+              onClick={nextImage}
+              className="bg-white/80 backdrop-blur-sm p-1.5 rounded-full text-stone-800 hover:bg-white transition-colors shadow-lg"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Admin Controls */}
+        {isAdmin && villa.imageUrls && villa.imageUrls.length > 0 && (
+          <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <button 
+              onClick={(e) => deleteImage(e, currentImage)}
+              disabled={isUpdating}
+              className="bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              title="Delete current image"
+            >
+              <Trash2 size={14} />
+            </button>
+            <div className="flex gap-1">
+              {currentImage > 0 && (
+                <button 
+                  onClick={(e) => moveImage(e, currentImage, currentImage - 1)}
+                  disabled={isUpdating}
+                  className="bg-stone-900/80 text-white p-2 rounded-full shadow-lg hover:bg-stone-900 transition-colors disabled:opacity-50"
+                  title="Move left"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              )}
+              {currentImage < villa.imageUrls.length - 1 && (
+                <button 
+                  onClick={(e) => moveImage(e, currentImage, currentImage + 1)}
+                  disabled={isUpdating}
+                  className="bg-stone-900/80 text-white p-2 rounded-full shadow-lg hover:bg-stone-900 transition-colors disabled:opacity-50"
+                  title="Move right"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Dots */}
+        {villa.imageUrls && villa.imageUrls.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-1.5">
+            {villa.imageUrls.map((_, idx) => (
+              <div 
+                key={idx}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${currentImage === idx ? 'bg-white w-3' : 'bg-white/50'}`}
+              />
+            ))}
+          </div>
+        )}
         <div className="absolute top-4 left-4">
           <span className="bg-white/90 backdrop-blur-sm text-stone-900 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm">
             {villa.location.split(',')[0]}
